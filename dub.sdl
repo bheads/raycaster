@@ -1,0 +1,7 @@
+name "raycast1"
+description "A minimal D application."
+authors "Byron"
+copyright "Copyright © 2018, Byron"
+license "proprietary"
+dependency "derelict-sdl2" version="~>3.1.0-alpha.3"
+dependency "gl3n" version="~>1.3.1"

@@ -54,6 +54,8 @@ void frame(const float delta, ref scope Renderer r, ref scope World w) {
             direction = direction * rot;
             plane = plane * rot;
         }
+
+        if (r.pixels is null) return;
         
 
         // Render
@@ -151,15 +153,31 @@ void frame(const float delta, ref scope Renderer r, ref scope World w) {
             color.g = clamp(color.g, 0.0f, 1.0f);
             color.b = clamp(color.b, 0.0f, 1.0f);
             color *= 255.0f;
-            r.drawLine(x, drawStart, x, drawEnd, cast(ubyte) (color.r), cast(ubyte) (color.g), cast(ubyte) (color.b));
+
+            // New method, drawing to the texture memory
+            // This uses little endien (may need to detect for other hardware...)
+            auto c = Color(255, cast(ubyte) (color.b), cast(ubyte) (color.g), cast(ubyte) (color.r));
+            foreach(int y; 0..screen.y) {
+                if (y >= drawStart && y <= drawEnd){
+                    (cast(int*)r.pixels)[(x * (r.pitch/4)) + y] = c.full;
+                } else {
+                    (cast(int*)r.pixels)[(x * (r.pitch/4)) + y] = 0x0;// c.full;
+                }
+            }
         }
     }
 }
 
 
-
-
-
+union Color {
+    struct {
+        ubyte a;
+        ubyte b;
+        ubyte g;
+        ubyte r;
+    }
+    int full;
+}
 
 void initMap(ref scope World w) {
     w.map = 

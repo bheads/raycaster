@@ -1,0 +1,16 @@
+- Add textured walls
+- Add textured flors
+- Add textured ceilings
+- Move rendering into a thread that runs with the SDL_UnlockTexture is uploading the texture (measure performance gains)
+
+- Add 3rd dimension 
+- Support player going up and down in the level (not looking for full 3d just want more then a single floor in the level)
+
+- Entity Engine
+-- Render flat entities in the game
+-- Render light sources 
+-- Make the player an entity and attach a light to it
+
+- Create better map input source, maybe a text file for the current level
+- Add doors
+- Add animated entities

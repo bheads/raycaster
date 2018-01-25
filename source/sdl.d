@@ -34,6 +34,9 @@ void drawLine(ref scope Renderer renderer, int x1, int y1, int x2, int y2, ubyte
 
 struct Renderer {
     private SDL_Window*     window;
+    private int             w;
+    private int             h;
+
     private SDL_Renderer*   renderer;
     private SDL_Texture*    texture;
 
@@ -74,9 +77,10 @@ bool startFrame(ref scope Renderer r) {
         }
         keys = SDL_GetKeyboardState(null);
 
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+        SDL_SetRenderDrawColor(renderer, 0, 0, 255, 0);
         SDL_RenderClear(renderer);
         sdlenforce(SDL_LockTexture(texture, null, &pixels, &pitch) == 0);
+        //for(int i = 0; i < pitch * textureHeight; i++) (cast(ubyte*) pixels)[i] = cast(ubyte)128;
     }
     return true; // still running
 }
@@ -85,10 +89,20 @@ bool startFrame(ref scope Renderer r) {
 void endFrame(ref scope Renderer r) {
     with (r) {
         SDL_UnlockTexture(texture);
-        //sdlenforce(SDL_RenderCopy(renderer, texture, null, null) == 0);
+
+        // Note: sdl makes the quad then rotates it...
+        auto destrect = SDL_Rect(0, h, h, w);
+        auto rotrect = SDL_Point(0, 0);
+        sdlenforce(SDL_RenderCopyEx(renderer, texture, null, &destrect, -90.0, &rotrect, SDL_FLIP_NONE) == 0);
+        //sdlenforce(SDL_RenderCopy(renderer, texture, &srcrect, &destrect) == 0);//, -90.0, null, SDL_FLIP_NONE) == 0);
         SDL_RenderPresent(renderer);
     }
 }
+
+const int textureWidth = 450;
+const int textureHeight = 800;
+
+import std.stdio;
 
 //// todo: window flags...
 @trusted
@@ -96,8 +110,9 @@ Renderer sdlInit(const int width = 800, const int height = 600) {
     auto renderer = Renderer();
     sdlenforce(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) == 0);
     sdlenforce(SDL_CreateWindowAndRenderer(width, height, SDL_WINDOW_ALLOW_HIGHDPI, &renderer.window, &renderer.renderer) == 0);
-
-    renderer.texture =  sdlenforce(SDL_CreateTexture(renderer.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, 800, 450));
+    renderer.w = width;
+    renderer.h = height;
+    renderer.texture =  sdlenforce(SDL_CreateTexture(renderer.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, textureWidth, textureHeight));
 
     renderer.last = SDL_GetPerformanceCounter();
 

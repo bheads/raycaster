@@ -113,9 +113,9 @@ void frame(const float delta, ref scope Renderer r, ref scope World w) {
             int drawEnd = clamp(lineHeight / 2 + screen.y / 2, 0, screen.y - 1);
             
             // todo: lighting sucks... Add more point lights into the mix
-            // auto light = vec3(0.02f); // ambiant light;
-            // float dist = 1+perpWallDist^^2;
-            // float intensity = 3f;
+            auto ambiant = vec3(0.05f); // ambiant light;
+            float dist = 1+perpWallDist^^2;
+            float intensity = 3f;
             // //light += slerp(vec3(1f), vec3(0f), smoothstep(0, intensity, perpWallDist));
             // //light += vec3(1f) * intensity / (1+dist);
             // light += slerp(vec3(0f), vec3(1f), max(0, intensity / (1+ dist)));
@@ -135,6 +135,8 @@ void frame(const float delta, ref scope Renderer r, ref scope World w) {
             if(side == 0 && ray.x > 0) texX = tex.w - texX - 1;
             if(side == 1 && ray.y < 0) texX = tex.w - texX - 1;
 
+           // auto light = ambiant + slerp(vec3(1f), vec3(0f), smoothstep(0, intensity, perpWallDist));
+            auto light = ambiant + slerp(vec3(0f), vec3(1f), max(0, intensity / (1+ dist)));
             uint drawcolor;
             foreach(int y; drawStart..drawEnd) {
                 // Compute color at this position
@@ -145,6 +147,10 @@ void frame(const float delta, ref scope Renderer r, ref scope World w) {
                     texY = clamp(texY, 0, tex.h-1);
 
                     Color c = Color(255, tex.pixels[(tex.w * 4 * texY) + (texX * 4) + 2], tex.pixels[(tex.w * 4 * texY) + (texX * 4) + 1], tex.pixels[(tex.w * 4 * texY) + (texX * 4) + 0]);
+
+                    c.r = cast(ubyte)(c.r * light.x);
+                    c.g = cast(ubyte)(c.g * light.y);
+                    c.b = cast(ubyte)(c.b * light.z);
 
                     drawcolor = c.full;// cast(uint*)(tex.pixels)[1];//[tex.w * texY + texX];
                     (cast(int*)r.pixels)[(x * (r.pitch/4)) + y] = drawcolor;
@@ -180,9 +186,11 @@ void frame(const float delta, ref scope Renderer r, ref scope World w) {
             //draw the floor from drawEnd to the bottom of the screen
             auto ftex = &r.walls[7];
             auto ctex = &r.walls[8];
-            for(int y = drawStart - 1; y >= 0; y--) {
+            for(int y = drawStart; y >= 0; y--) {
                 currentDist = screen.y / (screen.y - 2.0 * y); //you could make a small lookup table for this instead
-
+                dist = 1+currentDist^^2;
+                light = ambiant + slerp(vec3(0f), vec3(1f), max(0, intensity / (1+ dist)));
+            
                 double weight = (currentDist - distPlayer) / (distWall - distPlayer);
 
                 auto tile = weight * floor + (1.0 - weight) * position;
@@ -195,6 +203,10 @@ void frame(const float delta, ref scope Renderer r, ref scope World w) {
 
                 Color c = Color(255, ftex.pixels[(ftex.w * 4 * floorTexY) + (floorTexX * 4) + 2], ftex.pixels[(ftex.w * 4 * floorTexY) + (floorTexX * 4) + 1], ftex.pixels[(ftex.w * 4 * floorTexY) + (floorTexX * 4) + 0]);
 
+                c.r = cast(ubyte)(c.r * light.x);
+                c.g = cast(ubyte)(c.g * light.y);
+                c.b = cast(ubyte)(c.b * light.z);
+
                 drawcolor = c.full;// cast(uint*)(tex.pixels)[1];//[tex.w * texY + texX];
                 (cast(int*)r.pixels)[(x * (r.pitch/4)) + y] = drawcolor;// & 8355711;
 
@@ -203,6 +215,10 @@ void frame(const float delta, ref scope Renderer r, ref scope World w) {
                 floorTexY = cast(int)clamp((tile.y * ctex.h) % ctex.h, 0, ctex.h-1);
 
                 c = Color(255, ctex.pixels[(ctex.w * 4 * floorTexY) + (floorTexX * 4) + 2], ctex.pixels[(ctex.w * 4 * floorTexY) + (floorTexX * 4) + 1], ctex.pixels[(ctex.w * 4 * floorTexY) + (floorTexX * 4) + 0]);
+
+                c.r = cast(ubyte)(c.r * light.x);
+                c.g = cast(ubyte)(c.g * light.y);
+                c.b = cast(ubyte)(c.b * light.z);
 
                 drawcolor = c.full;// cast(uint*)(tex.pixels)[1];//[tex.w * texY + texX];
                 (cast(int*)r.pixels)[(x * (r.pitch/4)) + (screen.y - y)] = drawcolor;

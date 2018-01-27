@@ -13,7 +13,7 @@ debug import std.stdio;
 
 //// GameWorld
 struct World {
-    vec2i screen = vec2i(800, 450); // screen dimensions
+    vec2i screen = vec2i(textureHeight, textureWidth); // screen dimensions
     int[][] map;
     vec2 position = vec2(22f, 12f);
     vec2 direction = vec2(-1f, 0f);
@@ -26,7 +26,7 @@ struct World {
 const moveSpeed = 6.0;
 const rotationSpeed = 2.0*PI/3.0;
 
-@system //@nogc
+@system @nogc
 void frame(const float delta, ref scope Renderer r, ref scope World w) {
     with (w) {   
         // input
@@ -108,61 +108,104 @@ void frame(const float delta, ref scope Renderer r, ref scope World w) {
                 perpWallDist = (mappos.y - position.y + (1 - step.y) / 2) / ray.y;
             }
 
-            int lineHeight = cast(int)(screen.y / perpWallDist);
+            int lineHeight = cast(int)((screen.y / perpWallDist) * 1);
             int drawStart = clamp(-lineHeight / 2 + screen.y / 2, 0, screen.y - 1);
             int drawEnd = clamp(lineHeight / 2 + screen.y / 2, 0, screen.y - 1);
             
-            auto color = vec3(1.0f);
-
-            switch(map[mappos.y][mappos.x]) {
-                case 1:
-                    color = vec3(1.0f, 0.002f, 0.002f);
-                    break;
-                case 2:
-                    color = vec3(0.02f, 1.0f, 0.02f);
-                    break;
-                case 3:
-                    color = vec3(0.2f, 1.0f, 1.0f);
-                    break;
-                case 4:
-                    color = vec3(1.0f, 1.0f, 0.02f);
-                    break;
-                case 5:
-                    color = vec3(1.0f, 00.02f, 1.0f);
-                    break;
-                default:
-            }
-
-            if (side == 1) {
-                //color /= 2.0f;
-            }
-
             // todo: lighting sucks... Add more point lights into the mix
-            auto light = vec3(0.02f); // ambiant light;
-            float dist = 1+perpWallDist^^2;
-            float intensity = 3f;
-            //light += slerp(vec3(1f), vec3(0f), smoothstep(0, intensity, perpWallDist));
-            //light += vec3(1f) * intensity / (1+dist);
-            light += slerp(vec3(0f), vec3(1f), max(0, intensity / (1+ dist)));
+            // auto light = vec3(0.02f); // ambiant light;
+            // float dist = 1+perpWallDist^^2;
+            // float intensity = 3f;
+            // //light += slerp(vec3(1f), vec3(0f), smoothstep(0, intensity, perpWallDist));
+            // //light += vec3(1f) * intensity / (1+dist);
+            // light += slerp(vec3(0f), vec3(1f), max(0, intensity / (1+ dist)));
             
-            color.r *= light.r;
-            color.g *= light.g;
-            color.b *= light.b;
-           
-            color.r = clamp(color.r, 0.0f, 1.0f);
-            color.g = clamp(color.g, 0.0f, 1.0f);
-            color.b = clamp(color.b, 0.0f, 1.0f);
-            color *= 255.0f;
+            //texturing calculations
+            int texNum = clamp(map[mappos.y][mappos.x]-1, 0, 5); //1 subtracted from it so that texture 0 can be used!
+            auto tex = &r.walls[texNum];
 
-            // New method, drawing to the texture memory
-            // This uses little endien (may need to detect for other hardware...)
-            auto c = Color(255, cast(ubyte) (color.b), cast(ubyte) (color.g), cast(ubyte) (color.r));
-            foreach(int y; 0..screen.y) {
-                if (y >= drawStart && y <= drawEnd){
-                    (cast(int*)r.pixels)[(x * (r.pitch/4)) + y] = c.full;
-                } else {
-                    (cast(int*)r.pixels)[(x * (r.pitch/4)) + y] = 0x0;// c.full;
-                }
+            //calculate value of wallX
+            double wallX; //where exactly the wall was hit
+            if (side == 0) wallX = position.y + perpWallDist * ray.y;
+            else           wallX = position.x + perpWallDist * ray.x;
+            wallX -= (floor(wallX));
+
+            //x coordinate on the texture
+            int texX = cast(int)(wallX * tex.w);
+            if(side == 0 && ray.x > 0) texX = tex.w - texX - 1;
+            if(side == 1 && ray.y < 0) texX = tex.w - texX - 1;
+
+            uint drawcolor;
+            foreach(int y; drawStart..drawEnd) {
+                // Compute color at this position
+                    int d = y * 256 - screen.y * 128 + lineHeight * 128;  //256 and 128 factors to avoid floats
+                    int texY = ((d * tex.h) / lineHeight) / 256;
+
+                    texX = clamp(texX, 0, tex.w-1);
+                    texY = clamp(texY, 0, tex.h-1);
+
+                    Color c = Color(255, tex.pixels[(tex.w * 4 * texY) + (texX * 4) + 2], tex.pixels[(tex.w * 4 * texY) + (texX * 4) + 1], tex.pixels[(tex.w * 4 * texY) + (texX * 4) + 0]);
+
+                    drawcolor = c.full;// cast(uint*)(tex.pixels)[1];//[tex.w * texY + texX];
+                    (cast(int*)r.pixels)[(x * (r.pitch/4)) + y] = drawcolor;
+            }
+
+            // Draw the floors and ceiling
+
+             //FLOOR CASTING
+            vec2 floor;
+            
+            //4 different wall directions possible
+            if(side == 0 && ray.x > 0) {
+                floor.x = mappos.x;
+                floor.y = mappos.y + wallX;
+            } else if(side == 0 && ray.x < 0) {
+                floor.x = mappos.x + 1.0;
+                floor.y = mappos.y + wallX;
+            } else if(side == 1 && ray.y > 0) {
+                floor.x = mappos.x + wallX;
+                floor.y = mappos.y;
+            } else {
+                floor.x = mappos.x + wallX;
+                floor.y = mappos.y + 1.0;
+            }
+
+            double distWall, distPlayer, currentDist;
+
+            distWall = perpWallDist;
+            distPlayer = 0.0;
+
+            if (drawEnd < 0) drawEnd = screen.y; //becomes < 0 when the integer overflows
+
+            //draw the floor from drawEnd to the bottom of the screen
+            auto ftex = &r.walls[7];
+            auto ctex = &r.walls[8];
+            for(int y = drawStart - 1; y >= 0; y--) {
+                currentDist = screen.y / (screen.y - 2.0 * y); //you could make a small lookup table for this instead
+
+                double weight = (currentDist - distPlayer) / (distWall - distPlayer);
+
+                auto tile = weight * floor + (1.0 - weight) * position;
+                // double currentFloorX = weight * floorXWall + (1.0 - weight) * position.x;
+                // double currentFloorY = weight * floorYWall + (1.0 - weight) * posY;
+
+                int floorTexX, floorTexY;
+                floorTexX = cast(int)clamp((tile.x * ftex.w) % ftex.w, 0, ftex.w-1);
+                floorTexY = cast(int)clamp((tile.y * ftex.h) % ftex.h, 0, ftex.h-1);
+
+                Color c = Color(255, ftex.pixels[(ftex.w * 4 * floorTexY) + (floorTexX * 4) + 2], ftex.pixels[(ftex.w * 4 * floorTexY) + (floorTexX * 4) + 1], ftex.pixels[(ftex.w * 4 * floorTexY) + (floorTexX * 4) + 0]);
+
+                drawcolor = c.full;// cast(uint*)(tex.pixels)[1];//[tex.w * texY + texX];
+                (cast(int*)r.pixels)[(x * (r.pitch/4)) + y] = drawcolor;// & 8355711;
+
+                //ceiling (symmetrical!)
+                floorTexX = cast(int)clamp((tile.x * ctex.w) % ctex.w, 0, ctex.w-1);
+                floorTexY = cast(int)clamp((tile.y * ctex.h) % ctex.h, 0, ctex.h-1);
+
+                c = Color(255, ctex.pixels[(ctex.w * 4 * floorTexY) + (floorTexX * 4) + 2], ctex.pixels[(ctex.w * 4 * floorTexY) + (floorTexX * 4) + 1], ctex.pixels[(ctex.w * 4 * floorTexY) + (floorTexX * 4) + 0]);
+
+                drawcolor = c.full;// cast(uint*)(tex.pixels)[1];//[tex.w * texY + texX];
+                (cast(int*)r.pixels)[(x * (r.pitch/4)) + (screen.y - y)] = drawcolor;
             }
         }
     }
@@ -182,15 +225,15 @@ union Color {
 void initMap(ref scope World w) {
     w.map = 
     [
-        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-        [1,0,0,0,0,0,2,2,2,2,2,0,0,0,0,3,0,3,0,3,0,0,0,1],
-        [1,0,0,0,0,0,2,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,1],
-        [1,0,0,0,0,0,2,0,0,0,2,0,0,0,0,3,0,0,0,3,0,0,0,1],
-        [1,0,0,0,0,0,2,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,1],
-        [1,0,0,0,0,0,2,2,0,2,2,0,0,0,0,3,0,3,0,3,0,0,0,1],
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
+        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
+        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
+        [1,0,0,0,0,0,2,2,2,2,2,0,0,0,0,3,0,3,0,3,0,0,0,1,1],
+        [1,0,0,0,0,0,2,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
+        [1,0,0,0,0,0,2,0,0,0,2,0,0,0,0,3,0,0,0,3,0,0,0,1,1],
+        [1,0,0,0,0,0,2,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
+        [1,0,0,0,0,0,2,2,0,2,2,0,0,0,0,3,0,3,0,3,0,0,0,1,1],
         [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
         [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
         [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],

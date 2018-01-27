@@ -55,7 +55,7 @@ struct Renderer {
 
     Barrier                 barrier;
 
-    IFImage[32]             walls;
+    IFImage[char]           textures;
 
     int                                     bufferIndex = 0;
     Color[textureWidth][textureHeight][2]   buffers;
@@ -130,18 +130,19 @@ Renderer sdlInit(const int width = 800, const int height = 600) {
 
     renderer.last = SDL_GetPerformanceCounter();
 
-    renderer.walls[0] = read_image("pics/greystone.png", ColFmt.RGBA);
-    renderer.walls[1] = read_image("pics/redbrick.png", ColFmt.RGBA);
-    renderer.walls[2] = read_image("pics/bluestone.png", ColFmt.RGBA);
-    renderer.walls[3] = read_image("pics/mossy.png", ColFmt.RGBA);
-    renderer.walls[4] = read_image("pics/wood.png", ColFmt.RGBA);
-    renderer.walls[5] = read_image("pics/colorstone.png", ColFmt.RGBA);
-    renderer.walls[6] = read_image("pics/purplestone.png", ColFmt.RGBA);
+    // renderer.walls[0] = read_image("pics/greystone.png", ColFmt.RGBA);
+    // renderer.walls[1] = read_image("pics/redbrick.png", ColFmt.RGBA);
+    // renderer.walls[2] = read_image("pics/bluestone.png", ColFmt.RGBA);
+    // renderer.walls[3] = read_image("pics/mossy.png", ColFmt.RGBA);
+    // renderer.walls[4] = read_image("pics/wood.png", ColFmt.RGBA);
+    // renderer.walls[5] = read_image("pics/colorstone.png", ColFmt.RGBA);
+    // renderer.walls[6] = read_image("pics/purplestone.png", ColFmt.RGBA);
 
-    renderer.walls[7] = read_image("pics/floor.png", ColFmt.RGBA);
-    renderer.walls[8] = read_image("pics/ceiling.png", ColFmt.RGBA);
+    renderer.textures['s'] = read_image("pics/stone1.png", ColFmt.RGBA);
+    renderer.textures['f'] = read_image("pics/floor.png", ColFmt.RGBA);
+    renderer.textures['c'] = read_image("pics/ceiling.png", ColFmt.RGBA);
 
-    renderer.barrier = new Barrier(2);
+    //renderer.barrier = new Barrier(2);
 
     return renderer;
 }

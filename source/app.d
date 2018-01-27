@@ -13,7 +13,7 @@ int main()
 		scope(exit) quit(renderer);
 		
 		auto world = World();
-		world.initMap();
+		world.initLevel("map1.json");
 
 		// Main Loop
 		//auto t = new Thread({frame(renderer, world);}).start();

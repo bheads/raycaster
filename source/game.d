@@ -11,14 +11,15 @@ import gl3n.interpolate;
 // todo: mempool?
 debug import std.stdio;
 
+import std.ascii : toLower;
 
 //// GameWorld
 struct World {
     vec2i screen = vec2i(textureHeight, textureWidth); // screen dimensions
-    int[][] map;
-    vec2 position = vec2(22f, 12f);
-    vec2 direction = vec2(-1f, 0f);
-    vec2 plane = vec2(0f, 0.66f);
+    string[] map;
+    vec2 position = vec2(1.5f, 1.5f);
+    vec2 direction = vec2(0f, 1f);
+    vec2 plane = vec2(0.76f, 0f);
 
     this(this) @disable;
 }
@@ -31,8 +32,8 @@ uint vec3ToInt(scope ref vec3 v) {
 }
 
 
-pragma(inline, true)
-auto vclamp(vec3 v, float min = 0f, float max = 1f) {
+//pragma(inline, true)
+auto ref vclamp(ref vec3 v, float min = 0f, float max = 1f) {
     v.x = clamp(v.x, min, max);
     v.y = clamp(v.y, min, max);
     v.z = clamp(v.z, min, max);
@@ -64,11 +65,11 @@ void frame(ref scope Renderer r, ref scope World w) {
         //// TODO: Collision
         if (r.keys !is null && r.keys[VK_UP]) {
             auto newpos = position + direction * moveSpeed * delta;
-            if (map[cast(int)newpos.y][cast(int)newpos.x] == 0) position = newpos;
+            if (map[cast(int)newpos.y][cast(int)newpos.x] >= 'a') position = newpos;
         }
         if (r.keys !is null && r.keys[VK_DOWN]) {
             auto newpos = position - direction * moveSpeed * delta;
-            if (map[cast(int)newpos.y][cast(int)newpos.x] == 0) position = newpos;
+            if (map[cast(int)newpos.y][cast(int)newpos.x] >= 'a') position = newpos;
         }        
         if (r.keys !is null && r.keys[VK_RIGHT]) {
             auto angle = rotationSpeed * delta;
@@ -111,9 +112,9 @@ void frame(ref scope Renderer r, ref scope World w) {
                 sideDist.y = (mappos.y + 1.0 - position.y) * deltaDist.y;
             }
 
-            int t = 0;
-            while(hit == 0 && t < 50) {
-                t++;
+//            int t = 0;
+            while(hit == 0) {
+  //              t++;
                 // find the shorted dist
                 if (sideDist.x < sideDist.y) {
                     sideDist.x += deltaDist.x;
@@ -125,9 +126,9 @@ void frame(ref scope Renderer r, ref scope World w) {
                     side = 1;
                 }
 
-                if (mappos.x < 0 || mappos.y < 0 || mappos.x >= map[0].length || mappos.y >= map.length) break;
+                if (mappos.x < 0 || mappos.y < 0 || mappos.y >= map.length || mappos.x >= map[mappos.y].length) break;
                 // check for a hit!
-                if (map[mappos.y][mappos.x] > 0) hit = 1;
+                if (map[mappos.y][mappos.x] <= 'Z') hit = 1;
             }
 
             //if (hit == 0) continue; // skip misses
@@ -136,7 +137,6 @@ void frame(ref scope Renderer r, ref scope World w) {
             } else {
                 perpWallDist = (mappos.y - position.y + (1 - step.y) / 2) / ray.y;
             }
-
 
             int lineHeight = cast(int)((screen.y / perpWallDist) * 1);
             if (hit == 0) lineHeight = 0;
@@ -152,8 +152,7 @@ void frame(ref scope Renderer r, ref scope World w) {
             // light += slerp(vec3(0f), vec3(1f), max(0, intensity / (1+ dist)));
             
             //texturing calculations
-            int texNum = clamp(map[mappos.y][mappos.x]-1, 0, 5); //1 subtracted from it so that texture 0 can be used!
-            auto tex = &r.walls[texNum];
+            auto tex = &r.textures[map[mappos.y][mappos.x].toLower];
 
             //calculate value of wallX
             double wallX; //where exactly the wall was hit
@@ -211,13 +210,11 @@ void frame(ref scope Renderer r, ref scope World w) {
 
             if (drawEnd < 0) drawEnd = screen.y; //becomes < 0 when the integer overflows
 
-            //draw the floor from drawEnd to the bottom of the screen
-            auto ftex = &r.walls[7];
-            auto fpixels = cast(Color*)ftex.pixels.ptr;
-            auto ctex = &r.walls[8];
+            auto ctex = &r.textures['c'];
             auto cpixels = cast(Color*)ctex.pixels.ptr;
             int texY;
 
+            //draw the floor from drawEnd to the bottom of the screen
             for(int y = drawStart - 1; y >= 0; y--) {
                 currentDist = screen.y / (screen.y - 2.0 * y); //you could make a small lookup table for this instead
                 dist = 1+currentDist^^2;
@@ -225,7 +222,13 @@ void frame(ref scope Renderer r, ref scope World w) {
                
                 double weight = (currentDist - distPlayer) / (distWall - distPlayer);
                 auto tile = weight * floor + (1.0 - weight) * position;
+                if (tile.x < 0 || tile.y < 0 || tile.y >= map.length || tile.x >= map[cast(int)tile.y].length) continue;
 
+                auto findex = map[cast(int)tile.y][cast(int)tile.x];
+                auto ftex = findex in r.textures;
+                if (ftex is null) continue;
+                auto fpixels = cast(Color*)ftex.pixels.ptr;
+            
                 texX = cast(int)clamp((tile.x * ftex.w) % ftex.w, 0, ftex.w-1);
                 texY = cast(int)clamp((tile.y * ftex.h) % ftex.h, 0, ftex.h-1);
 
@@ -250,33 +253,37 @@ void frame(ref scope Renderer r, ref scope World w) {
 }
 
 
-void initMap(ref scope World w) {
+void initLevel(ref scope World w, scope string map) {
+    import std.conv : to;
     w.map = 
     [
-        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-        [1,0,0,0,0,0,2,2,2,2,2,0,0,0,0,3,0,3,0,3,0,0,0,1,1],
-        [1,0,0,0,0,0,2,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-        [1,0,0,0,0,0,2,0,0,0,2,0,0,0,0,3,0,0,0,3,0,0,0,1,1],
-        [1,0,0,0,0,0,2,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-        [1,0,0,0,0,0,2,2,0,2,2,0,0,0,0,3,0,3,0,3,0,0,0,1,1],
-        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-        [1,4,4,4,4,4,4,4,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-        [1,4,0,4,0,0,0,0,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-        [1,4,0,0,0,0,5,0,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-        [1,4,0,4,0,0,0,0,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-        [1,4,0,4,4,4,4,4,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-        [1,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-        [1,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-        [1,4,4,4,4,4,4,4,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+        "SSSSSSSSSSSSSSSS",
+        "ScssssssssssssfS",
+        "SsSSSSSSSSSSSSsSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS",
+        "SfFffffffffffSffffffffffffffffffffffffffffffffffffffffffffffffffffS",
+        "SsSfSSSfSSSSfSfSffffffffffffffffffffffffffffffffffffffffffffffffffS",
+        "CcffSfffSffSfffSffffffffffffffffffffffffffffffffffffffffffffffffffS",
+        "SSSSSfSSSffSSSSSffffffffffffffffffffffffffffffffffffffffffffffffffS",
+        "SffffffffffSffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
+        "SfSSSSSSSSfSffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
+        "SfSfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
+        "SfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
+        "SfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
+        "SfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
+        "SfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
+        "SfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
+        "SfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
+        "SfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
+        "SfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
+        "SfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
+        "SfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
+        "SfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
+        "SfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
+        "SfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
+        "SfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
+        "SfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
+        "SfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
+        "SfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
+        "SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS"
     ];
 }

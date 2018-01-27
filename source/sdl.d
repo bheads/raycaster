@@ -57,8 +57,7 @@ struct Renderer {
 
     IFImage[char]           textures;
 
-    int                                     bufferIndex = 0;
-    Color[textureWidth][textureHeight][2]   buffers;
+    Color[textureWidth][textureHeight]   buffer;
     bool                    running = true;
 }
 
@@ -100,8 +99,7 @@ void endFrame(ref scope Renderer r) {
     with (r) {
   //      SDL_UnlockTexture(texture);
         //r.barrier.wait();
-        SDL_UpdateTexture(texture, null, buffers[(bufferIndex + 1) % 2].ptr, textureWidth * Color.sizeof);
-        bufferIndex = (bufferIndex + 1) % 2;
+        SDL_UpdateTexture(texture, null, buffer.ptr, textureWidth * Color.sizeof);
 
         // Note: sdl makes the quad then rotates it...
         auto destrect = SDL_Rect(0, h, h, w);
@@ -113,8 +111,8 @@ void endFrame(ref scope Renderer r) {
     }
 }
 
-const int textureWidth = 338;//450;
-const int textureHeight = 600;//800;
+const int textureWidth = 450;//450;
+const int textureHeight = 800;//800;
 
 import std.stdio;
 
@@ -129,14 +127,6 @@ Renderer sdlInit(const int width = 800, const int height = 600) {
     renderer.texture =  sdlenforce(SDL_CreateTexture(renderer.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, textureWidth, textureHeight));
 
     renderer.last = SDL_GetPerformanceCounter();
-
-    // renderer.walls[0] = read_image("pics/greystone.png", ColFmt.RGBA);
-    // renderer.walls[1] = read_image("pics/redbrick.png", ColFmt.RGBA);
-    // renderer.walls[2] = read_image("pics/bluestone.png", ColFmt.RGBA);
-    // renderer.walls[3] = read_image("pics/mossy.png", ColFmt.RGBA);
-    // renderer.walls[4] = read_image("pics/wood.png", ColFmt.RGBA);
-    // renderer.walls[5] = read_image("pics/colorstone.png", ColFmt.RGBA);
-    // renderer.walls[6] = read_image("pics/purplestone.png", ColFmt.RGBA);
 
     renderer.textures['s'] = read_image("pics/stone1.png", ColFmt.RGBA);
     renderer.textures['f'] = read_image("pics/floor.png", ColFmt.RGBA);

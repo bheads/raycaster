@@ -172,15 +172,15 @@ void frame(ref scope Renderer r, ref scope World w) {
             foreach(int y; drawStart..drawEnd) {
                 // Compute color at this position
                     int d = y * 256 - screen.y * 128 + lineHeight * 128;  //256 and 128 factors to avoid floats
-                    int texY = ((d * tex.h) / lineHeight) / 256;
+                    int texY = (((d * tex.h) / lineHeight) / 256) + 1;
 
                     texX = clamp(texX, 0, tex.w-1);
-                    texY = clamp(texY, 0, tex.h-1);
+                    texY = tex.h - clamp(texY, 0, tex.h-1);
 
                     auto c = pixels[(tex.w * texY) + texX];
                     vec3 color = vec3(c.r/255f, c.g/255f, c.b/255f).mult(vec3(light));// light;
                     color = vclamp(color) * 255f;
-                    r.buffers[r.bufferIndex][x][y].full = vec3ToInt(color);
+                    r.buffer[x][y].full = vec3ToInt(color);
             }
 
             // Draw the floors and ceiling
@@ -230,21 +230,21 @@ void frame(ref scope Renderer r, ref scope World w) {
                 auto fpixels = cast(Color*)ftex.pixels.ptr;
             
                 texX = cast(int)clamp((tile.x * ftex.w) % ftex.w, 0, ftex.w-1);
-                texY = cast(int)clamp((tile.y * ftex.h) % ftex.h, 0, ftex.h-1);
+                texY = ftex.h - cast(int)clamp((tile.y * ftex.h) % ftex.h+1, 0, ftex.h-1);
 
                 auto c = fpixels[(ftex.w * texY) + texX];
                 vec3 color = vec3(c.r/255f, c.g/255f, c.b/255f).mult(vec3(light));// light;
                 color = vclamp(color) * 255f;
-                r.buffers[r.bufferIndex][x][y].full = vec3ToInt(color);
+                r.buffer[x][y].full = vec3ToInt(color);
                 
                 //ceiling (symmetrical!)
                 texX = cast(int)clamp((tile.x * ctex.w) % ctex.w, 0, ctex.w-1);
-                texY = cast(int)clamp((tile.y * ctex.h) % ctex.h, 0, ctex.h-1);
+                texY = ctex.h - cast(int)clamp((tile.y * ctex.h) % ctex.h+1, 0, ctex.h-1);
 
                 c = cpixels[(ctex.w * texY) + texX];
                 color = vec3(c.r/255f, c.g/255f, c.b/255f).mult(vec3(light));// light;
                 color = vclamp(color) * 255f;
-                r.buffers[r.bufferIndex][x][screen.y - 1- y].full = vec3ToInt(color);
+                r.buffer[x][screen.y - 1- y].full = vec3ToInt(color);
 
             } // y
         } // x

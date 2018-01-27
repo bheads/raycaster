@@ -1,6 +1,7 @@
 module raycaster.main;
 
 import std.stdio : writeln;
+import core.thread;
 
 import raycaster.sdl;
 import raycaster.game;
@@ -14,12 +15,15 @@ int main()
 		auto world = World();
 		world.initMap();
 
-		// Main Loop
-		for(bool running = true; running; running = renderer.startFrame) {
 
-			frame(renderer.delta, renderer, world); // todo: frame limiter, or vsync?
+
+		// Main Loop
+		//auto t = new Thread({frame(renderer, world);}).start();
+		for(bool running = true; running; running = renderer.startFrame) {
+			frame(renderer, world); // todo: frame limiter, or vsync?		
 			renderer.endFrame();
 		}
+		renderer.running = false;
 
 		return 0;
 	} catch (Exception e) {		

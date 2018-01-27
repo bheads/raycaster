@@ -12,6 +12,7 @@ import derelict.sdl2.sdl;
 
 
 public:
+import core.sync.barrier;
 
 import imageformats;
 
@@ -25,14 +26,15 @@ alias VK_DOWN = SDL_SCANCODE_DOWN;
 
 
 
-/* this sucks */
-@trusted @nogc
-void drawLine(ref scope Renderer renderer, int x1, int y1, int x2, int y2, ubyte r = 255, ubyte g = 255, ubyte b = 255) {
-    SDL_SetRenderDrawColor(renderer.renderer, r, g, b, SDL_ALPHA_OPAQUE);
-    SDL_RenderDrawLine(renderer.renderer, x1, y1, x2, y2);
-
+union Color {
+    struct {
+        ubyte a;
+        ubyte b;
+        ubyte g;
+        ubyte r;
+    }
+    int full;
 }
-
 
 struct Renderer {
     private SDL_Window*     window;
@@ -45,16 +47,19 @@ struct Renderer {
     private SDL_Event       event;
     ubyte*                  keys;
 
-    void*                   pixels;
-    int                     pitch;
-
     float delta; // fraction of 1 secound
     int fps = 0 ;
     private ulong last;
     private uint fCount = 0;
     private double fTime = 0;
 
+    Barrier                 barrier;
+
     IFImage[32]             walls;
+
+    int                                     bufferIndex = 0;
+    Color[textureWidth][textureHeight][2]   buffers;
+    bool                    running = true;
 }
 
 @trusted //@nogc
@@ -83,16 +88,20 @@ bool startFrame(ref scope Renderer r) {
 
         SDL_SetRenderDrawColor(renderer, 0, 0, 255, 0);
         SDL_RenderClear(renderer);
-        sdlenforce(SDL_LockTexture(texture, null, &pixels, &pitch) == 0);
-        //for(int i = 0; i < pitch * textureHeight; i++) (cast(ubyte*) pixels)[i] = cast(ubyte)128;
+//        sdlenforce(SDL_LockTexture(texture, null, &pixels, &pitch) == 0);
+        //for(int i = 0; i < pitch * textureHeight; i++barrier) (cast(ubyte*) pixels)[i] = cast(ubyte)128;
     }
+    //r.barrier.wait();
     return true; // still running
 }
 
 @trusted 
 void endFrame(ref scope Renderer r) {
     with (r) {
-        SDL_UnlockTexture(texture);
+  //      SDL_UnlockTexture(texture);
+        //r.barrier.wait();
+        SDL_UpdateTexture(texture, null, buffers[(bufferIndex + 1) % 2].ptr, textureWidth * Color.sizeof);
+        bufferIndex = (bufferIndex + 1) % 2;
 
         // Note: sdl makes the quad then rotates it...
         auto destrect = SDL_Rect(0, h, h, w);
@@ -100,6 +109,7 @@ void endFrame(ref scope Renderer r) {
         sdlenforce(SDL_RenderCopyEx(renderer, texture, null, &destrect, -90.0, &rotrect, SDL_FLIP_NONE) == 0);
         //sdlenforce(SDL_RenderCopy(renderer, texture, &srcrect, &destrect) == 0);//, -90.0, null, SDL_FLIP_NONE) == 0);
         SDL_RenderPresent(renderer);
+        
     }
 }
 
@@ -131,8 +141,7 @@ Renderer sdlInit(const int width = 800, const int height = 600) {
     renderer.walls[7] = read_image("pics/floor.png", ColFmt.RGBA);
     renderer.walls[8] = read_image("pics/ceiling.png", ColFmt.RGBA);
 
-
-
+    renderer.barrier = new Barrier(2);
 
     return renderer;
 }
@@ -159,7 +168,7 @@ shared static this() {
     DerelictSDL2.load();
 }
 
-pragma(inline, true)
+//pragma(inline, true)
 T sdlenforce(T) (T value, string file = __FILE__, size_t line = __LINE__) {
     import std.exception : enforce;
     import std.format : format;

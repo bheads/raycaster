@@ -1,5 +1,6 @@
 module raycaster.game;
-
+import std.range : iota;
+import std.parallelism;
 
 import raycaster.sdl;
 
@@ -26,10 +27,14 @@ struct World {
 const moveSpeed = 6.0;
 const rotationSpeed = 2.0*PI/3.0;
 
-@system @nogc
-void frame(const float delta, ref scope Renderer r, ref scope World w) {
-    with (w) {   
+@system //@nogc
+void frame(ref scope Renderer r, ref scope World w) {
+    //while(r.running)
+    with (w) { 
+       // r.barrier.wait();  
         // input
+        const float delta = r.delta;
+        //if (delta >= 0) continue;
 
         //// TODO: Collision
         if (r.keys !is null && r.keys[VK_UP]) {
@@ -55,12 +60,9 @@ void frame(const float delta, ref scope Renderer r, ref scope World w) {
             plane = plane * rot;
         }
 
-        if (r.pixels is null) return;
-        
-
         // Render
         // foreach col on the screen
-        foreach(int x; 0..screen.x) {
+        foreach(int x; parallel(iota(0, screen.x))) {
             double cameraX = 2.0 * x / screen.x - 1.0;
             auto ray = vec2d(direction.x + plane.x * cameraX, direction.y + plane.y * cameraX);
             auto mappos = vec2i(cast(int)position.x, cast(int)position.y);
@@ -109,8 +111,8 @@ void frame(const float delta, ref scope Renderer r, ref scope World w) {
             }
 
             int lineHeight = cast(int)((screen.y / perpWallDist) * 1);
-            int drawStart = clamp(-lineHeight / 2 + screen.y / 2, 0, screen.y - 1);
-            int drawEnd = clamp(lineHeight / 2 + screen.y / 2, 0, screen.y - 1);
+            int drawStart = clamp(-lineHeight / 2 + screen.y / 2, 0, screen.y);
+            int drawEnd = clamp(lineHeight / 2 + screen.y / 2, 0, screen.y);
             
             // todo: lighting sucks... Add more point lights into the mix
             auto ambiant = vec3(0.05f); // ambiant light;
@@ -152,8 +154,7 @@ void frame(const float delta, ref scope Renderer r, ref scope World w) {
                     c.g = cast(ubyte)(c.g * light.y);
                     c.b = cast(ubyte)(c.b * light.z);
 
-                    drawcolor = c.full;// cast(uint*)(tex.pixels)[1];//[tex.w * texY + texX];
-                    (cast(int*)r.pixels)[(x * (r.pitch/4)) + y] = drawcolor;
+                    r.buffers[r.bufferIndex][x][y].full = c.full;
             }
 
             // Draw the floors and ceiling
@@ -186,7 +187,7 @@ void frame(const float delta, ref scope Renderer r, ref scope World w) {
             //draw the floor from drawEnd to the bottom of the screen
             auto ftex = &r.walls[7];
             auto ctex = &r.walls[8];
-            for(int y = drawStart; y >= 0; y--) {
+            for(int y = drawStart - 1; y >= 0; y--) {
                 currentDist = screen.y / (screen.y - 2.0 * y); //you could make a small lookup table for this instead
                 dist = 1+currentDist^^2;
                 light = ambiant + slerp(vec3(0f), vec3(1f), max(0, intensity / (1+ dist)));
@@ -207,9 +208,8 @@ void frame(const float delta, ref scope Renderer r, ref scope World w) {
                 c.g = cast(ubyte)(c.g * light.y);
                 c.b = cast(ubyte)(c.b * light.z);
 
-                drawcolor = c.full;// cast(uint*)(tex.pixels)[1];//[tex.w * texY + texX];
-                (cast(int*)r.pixels)[(x * (r.pitch/4)) + y] = drawcolor;// & 8355711;
-
+                r.buffers[r.bufferIndex][x][y].full = c.full;
+                
                 //ceiling (symmetrical!)
                 floorTexX = cast(int)clamp((tile.x * ctex.w) % ctex.w, 0, ctex.w-1);
                 floorTexY = cast(int)clamp((tile.y * ctex.h) % ctex.h, 0, ctex.h-1);
@@ -220,23 +220,13 @@ void frame(const float delta, ref scope Renderer r, ref scope World w) {
                 c.g = cast(ubyte)(c.g * light.y);
                 c.b = cast(ubyte)(c.b * light.z);
 
-                drawcolor = c.full;// cast(uint*)(tex.pixels)[1];//[tex.w * texY + texX];
-                (cast(int*)r.pixels)[(x * (r.pitch/4)) + (screen.y - y)] = drawcolor;
-            }
-        }
-    }
+                r.buffers[r.bufferIndex][x][screen.y - 1 - y].full = c.full;
+            } // y
+        } // x
+        //r.barrier.wait();
+    }// with
 }
 
-
-union Color {
-    struct {
-        ubyte a;
-        ubyte b;
-        ubyte g;
-        ubyte r;
-    }
-    int full;
-}
 
 void initMap(ref scope World w) {
     w.map = 

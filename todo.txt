@@ -8,5 +8,6 @@
 -- Make the player an entity and attach a light to it
 
 - Create better map input source, maybe a text file for the current level
+- Find a way to change the ceiling tile on the map?
 - Add doors
 - Add animated entities

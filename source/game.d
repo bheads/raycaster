@@ -19,7 +19,7 @@ struct World {
     string[] map;
     vec2 position = vec2(1.5f, 1.5f);
     vec2 direction = vec2(0f, 1f);
-    vec2 plane = vec2(0.76f, 0f);
+    vec2 plane = vec2(-0.76f, 0f);
 
     this(this) @disable;
 }
@@ -72,14 +72,14 @@ void frame(ref scope Renderer r, ref scope World w) {
             if (map[cast(int)newpos.y][cast(int)newpos.x] >= 'a') position = newpos;
         }        
         if (r.keys !is null && r.keys[VK_RIGHT]) {
-            auto angle = rotationSpeed * delta;
+            auto angle = -rotationSpeed * delta;
             auto rot = mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
 
             direction = direction * rot;
             plane = plane * rot;
         }
         if (r.keys !is null && r.keys[VK_LEFT]) {
-            auto angle = -rotationSpeed * delta;
+            auto angle = rotationSpeed * delta;
             auto rot = mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
 
             direction = direction * rot;
@@ -261,29 +261,13 @@ void initLevel(ref scope World w, scope string map) {
         "ScssssssssssssfS",
         "SsSSSSSSSSSSSSsSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS",
         "SfFffffffffffSffffffffffffffffffffffffffffffffffffffffffffffffffffS",
-        "SsSfSSSfSSSSfSfSffffffffffffffffffffffffffffffffffffffffffffffffffS",
-        "CcffSfffSffSfffSffffffffffffffffffffffffffffffffffffffffffffffffffS",
-        "SSSSSfSSSffSSSSSffffffffffffffffffffffffffffffffffffffffffffffffffS",
-        "SffffffffffSffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
-        "SfSSSSSSSSfSffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
-        "SfSfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
-        "SfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
-        "SfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
-        "SfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
-        "SfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
-        "SfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
-        "SfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
-        "SfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
-        "SfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
-        "SfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
-        "SfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
-        "SfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
-        "SfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
-        "SfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
-        "SfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
-        "SfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
-        "SfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
-        "SfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffS",
+        "SsSfSSSfSSSSfSfSFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFSS",
+        "CcffSfffSffSfffSS",
+        "SSSSSfSSSffSSSSS",
+        "SffffffffffS",
+        "SfSSSSSSSSSS",
+        "SfS",
+        "SCS",
         "SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS"
     ];
 }

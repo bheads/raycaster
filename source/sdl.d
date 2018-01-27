@@ -28,12 +28,12 @@ alias VK_DOWN = SDL_SCANCODE_DOWN;
 
 union Color {
     struct {
-        ubyte a;
-        ubyte b;
-        ubyte g;
         ubyte r;
+        ubyte g;
+        ubyte b;
+        ubyte a;
     }
-    int full;
+    uint full;
 }
 
 struct Renderer {

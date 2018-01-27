@@ -23,6 +23,31 @@ struct World {
     this(this) @disable;
 }
 
+pragma(inline, true)
+uint vec3ToInt(scope ref vec3 v) {
+    // little endien
+    return (cast(int)v.x << 24) + (cast(int)v.y << 16) + (cast(int)v.z << 8) + 255 ; 
+    //return (255<<24) + (0 << 16) + (0 << 8) + 255;//128;
+}
+
+
+pragma(inline, true)
+auto vclamp(vec3 v, float min = 0f, float max = 1f) {
+    v.x = clamp(v.x, min, max);
+    v.y = clamp(v.y, min, max);
+    v.z = clamp(v.z, min, max);
+    return v;
+}
+
+pragma(inline, true)
+vec3 mult(vec3 a, vec3 b) {
+    vec3 r;
+    r.x = a.x * b.x;
+    r.y = a.y * b.y;
+    r.z = a.z * b.z;
+
+    return r; 
+}
 
 const moveSpeed = 6.0;
 const rotationSpeed = 2.0*PI/3.0;
@@ -86,7 +111,9 @@ void frame(ref scope Renderer r, ref scope World w) {
                 sideDist.y = (mappos.y + 1.0 - position.y) * deltaDist.y;
             }
 
-            while(hit == 0) {
+            int t = 0;
+            while(hit == 0 && t < 50) {
+                t++;
                 // find the shorted dist
                 if (sideDist.x < sideDist.y) {
                     sideDist.x += deltaDist.x;
@@ -103,21 +130,23 @@ void frame(ref scope Renderer r, ref scope World w) {
                 if (map[mappos.y][mappos.x] > 0) hit = 1;
             }
 
-            if (hit == 0) continue; // skip misses
+            //if (hit == 0) continue; // skip misses
             if (side == 0) {
                 perpWallDist = (mappos.x - position.x + (1 - step.x) / 2) / ray.x;
             } else {
                 perpWallDist = (mappos.y - position.y + (1 - step.y) / 2) / ray.y;
             }
 
+
             int lineHeight = cast(int)((screen.y / perpWallDist) * 1);
+            if (hit == 0) lineHeight = 0;
             int drawStart = clamp(-lineHeight / 2 + screen.y / 2, 0, screen.y);
             int drawEnd = clamp(lineHeight / 2 + screen.y / 2, 0, screen.y);
             
             // todo: lighting sucks... Add more point lights into the mix
-            auto ambiant = vec3(0.05f); // ambiant light;
+            auto ambiant = vec3(0.1f); // ambiant light;
             float dist = 1+perpWallDist^^2;
-            float intensity = 3f;
+            float intensity = 2f;
             // //light += slerp(vec3(1f), vec3(0f), smoothstep(0, intensity, perpWallDist));
             // //light += vec3(1f) * intensity / (1+dist);
             // light += slerp(vec3(0f), vec3(1f), max(0, intensity / (1+ dist)));
@@ -138,8 +167,9 @@ void frame(ref scope Renderer r, ref scope World w) {
             if(side == 1 && ray.y < 0) texX = tex.w - texX - 1;
 
            // auto light = ambiant + slerp(vec3(1f), vec3(0f), smoothstep(0, intensity, perpWallDist));
-            auto light = ambiant + slerp(vec3(0f), vec3(1f), max(0, intensity / (1+ dist)));
-            uint drawcolor;
+            vec3 light = (ambiant + lerp(vec3(0f), vec3(1f), smoothstep(0f, 1f, (intensity / (1+ dist)))));
+            auto pixels = cast(Color*)tex.pixels.ptr;
+
             foreach(int y; drawStart..drawEnd) {
                 // Compute color at this position
                     int d = y * 256 - screen.y * 128 + lineHeight * 128;  //256 and 128 factors to avoid floats
@@ -148,13 +178,10 @@ void frame(ref scope Renderer r, ref scope World w) {
                     texX = clamp(texX, 0, tex.w-1);
                     texY = clamp(texY, 0, tex.h-1);
 
-                    Color c = Color(255, tex.pixels[(tex.w * 4 * texY) + (texX * 4) + 2], tex.pixels[(tex.w * 4 * texY) + (texX * 4) + 1], tex.pixels[(tex.w * 4 * texY) + (texX * 4) + 0]);
-
-                    c.r = cast(ubyte)(c.r * light.x);
-                    c.g = cast(ubyte)(c.g * light.y);
-                    c.b = cast(ubyte)(c.b * light.z);
-
-                    r.buffers[r.bufferIndex][x][y].full = c.full;
+                    auto c = pixels[(tex.w * texY) + texX];
+                    vec3 color = vec3(c.r/255f, c.g/255f, c.b/255f).mult(vec3(light));// light;
+                    color = vclamp(color) * 255f;
+                    r.buffers[r.bufferIndex][x][y].full = vec3ToInt(color);
             }
 
             // Draw the floors and ceiling
@@ -186,41 +213,36 @@ void frame(ref scope Renderer r, ref scope World w) {
 
             //draw the floor from drawEnd to the bottom of the screen
             auto ftex = &r.walls[7];
+            auto fpixels = cast(Color*)ftex.pixels.ptr;
             auto ctex = &r.walls[8];
+            auto cpixels = cast(Color*)ctex.pixels.ptr;
+            int texY;
+
             for(int y = drawStart - 1; y >= 0; y--) {
                 currentDist = screen.y / (screen.y - 2.0 * y); //you could make a small lookup table for this instead
                 dist = 1+currentDist^^2;
-                light = ambiant + slerp(vec3(0f), vec3(1f), max(0, intensity / (1+ dist)));
-            
+                light = ambiant + slerp(vec3(0f), vec3(1f), smoothstep(0f, 1f, intensity / (1+ dist)));
+               
                 double weight = (currentDist - distPlayer) / (distWall - distPlayer);
-
                 auto tile = weight * floor + (1.0 - weight) * position;
-                // double currentFloorX = weight * floorXWall + (1.0 - weight) * position.x;
-                // double currentFloorY = weight * floorYWall + (1.0 - weight) * posY;
 
-                int floorTexX, floorTexY;
-                floorTexX = cast(int)clamp((tile.x * ftex.w) % ftex.w, 0, ftex.w-1);
-                floorTexY = cast(int)clamp((tile.y * ftex.h) % ftex.h, 0, ftex.h-1);
+                texX = cast(int)clamp((tile.x * ftex.w) % ftex.w, 0, ftex.w-1);
+                texY = cast(int)clamp((tile.y * ftex.h) % ftex.h, 0, ftex.h-1);
 
-                Color c = Color(255, ftex.pixels[(ftex.w * 4 * floorTexY) + (floorTexX * 4) + 2], ftex.pixels[(ftex.w * 4 * floorTexY) + (floorTexX * 4) + 1], ftex.pixels[(ftex.w * 4 * floorTexY) + (floorTexX * 4) + 0]);
-
-                c.r = cast(ubyte)(c.r * light.x);
-                c.g = cast(ubyte)(c.g * light.y);
-                c.b = cast(ubyte)(c.b * light.z);
-
-                r.buffers[r.bufferIndex][x][y].full = c.full;
+                auto c = fpixels[(ftex.w * texY) + texX];
+                vec3 color = vec3(c.r/255f, c.g/255f, c.b/255f).mult(vec3(light));// light;
+                color = vclamp(color) * 255f;
+                r.buffers[r.bufferIndex][x][y].full = vec3ToInt(color);
                 
                 //ceiling (symmetrical!)
-                floorTexX = cast(int)clamp((tile.x * ctex.w) % ctex.w, 0, ctex.w-1);
-                floorTexY = cast(int)clamp((tile.y * ctex.h) % ctex.h, 0, ctex.h-1);
+                texX = cast(int)clamp((tile.x * ctex.w) % ctex.w, 0, ctex.w-1);
+                texY = cast(int)clamp((tile.y * ctex.h) % ctex.h, 0, ctex.h-1);
 
-                c = Color(255, ctex.pixels[(ctex.w * 4 * floorTexY) + (floorTexX * 4) + 2], ctex.pixels[(ctex.w * 4 * floorTexY) + (floorTexX * 4) + 1], ctex.pixels[(ctex.w * 4 * floorTexY) + (floorTexX * 4) + 0]);
+                c = cpixels[(ctex.w * texY) + texX];
+                color = vec3(c.r/255f, c.g/255f, c.b/255f).mult(vec3(light));// light;
+                color = vclamp(color) * 255f;
+                r.buffers[r.bufferIndex][x][screen.y - 1- y].full = vec3ToInt(color);
 
-                c.r = cast(ubyte)(c.r * light.x);
-                c.g = cast(ubyte)(c.g * light.y);
-                c.b = cast(ubyte)(c.b * light.z);
-
-                r.buffers[r.bufferIndex][x][screen.y - 1 - y].full = c.full;
             } // y
         } // x
         //r.barrier.wait();

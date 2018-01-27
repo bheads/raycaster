@@ -15,8 +15,6 @@ int main()
 		auto world = World();
 		world.initMap();
 
-
-
 		// Main Loop
 		//auto t = new Thread({frame(renderer, world);}).start();
 		for(bool running = true; running; running = renderer.startFrame) {

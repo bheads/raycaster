@@ -105,7 +105,7 @@ void frame(ref scope Renderer r, ref scope World w) {
 
                 if (mappos.x < 0 || mappos.y < 0 || mappos.y >= map.length || mappos.x >= map[mappos.y].length) break;
                 // check for a hit!
-                if (map[mappos.y][mappos.x] <= 'Z') hit = 1;
+                if ('A' <= map[mappos.y][mappos.x] && map[mappos.y][mappos.x] <= 'Z') hit = 1;
             }
 
             //if (hit == 0) continue; // skip misses

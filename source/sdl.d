@@ -5,7 +5,7 @@ module raycaster.sdl;
  */
 private:
 import std.string : toStringz;
-import std.format : format;
+import std.format : sformat;
 
 
 import derelict.sdl2.sdl;
@@ -65,8 +65,9 @@ struct Renderer {
     bool                    running = true;
 }
 
-@trusted //@nogc
+@trusted
 bool startFrame(ref scope Renderer r) {    
+    char[128] sbuf;
     with (r) {
         // compute frame time
         auto now = SDL_GetPerformanceCounter();
@@ -79,7 +80,8 @@ bool startFrame(ref scope Renderer r) {
             fTime -= 1.0;
             fps = fCount;
             fCount = 0;
-            SDL_SetWindowTitle(window, format("RayCaster FPS: %s  DELTA: %s", fps, delta).toStringz);
+            sbuf.sformat("RayCaster FPS: %s DELTA: %s\0", fps, delta);
+            SDL_SetWindowTitle(window, sbuf.ptr);
         }
 
 

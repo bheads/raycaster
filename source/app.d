@@ -10,15 +10,16 @@ int main()
 {
 	try {
 		auto renderer = init(1280, 720);
+		debug writeln("Renderer.init");
 		scope(exit) quit(renderer);
 		
 		auto world = World();
 		world.initLevel("map1.json");
 
 		// Main Loop
-		//auto t = new Thread({frame(renderer, world);}).start();
+		auto t = new Thread({frame(renderer, world);}).start();
 		for(bool running = true; running; running = renderer.startFrame) {
-			frame(renderer, world); // todo: frame limiter, or vsync?		
+			//frame(renderer, world); // todo: frame limiter, or vsync?		
 			renderer.endFrame();
 		}
 		renderer.running = false;

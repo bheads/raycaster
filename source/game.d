@@ -55,36 +55,13 @@ const rotationSpeed = 2.0*PI/3.0;
 
 @system //@nogc
 void frame(ref scope Renderer r, ref scope World w) {
-    //while(r.running)
+    int bindex = 0;
+    while(r.running)
     with (w) { 
-       // r.barrier.wait();  
+        r.barrier.wait();  
+        bindex = (bindex + 1) % 2;
         // input
-        const float delta = r.delta;
-        //if (delta >= 0) continue;
-
-        //// TODO: Collision
-        if (r.keys !is null && r.keys[VK_UP]) {
-            auto newpos = position + direction * moveSpeed * delta;
-            if (map[cast(int)newpos.y][cast(int)newpos.x] >= 'a') position = newpos;
-        }
-        if (r.keys !is null && r.keys[VK_DOWN]) {
-            auto newpos = position - direction * moveSpeed * delta;
-            if (map[cast(int)newpos.y][cast(int)newpos.x] >= 'a') position = newpos;
-        }        
-        if (r.keys !is null && r.keys[VK_RIGHT]) {
-            auto angle = -rotationSpeed * delta;
-            auto rot = mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
-
-            direction = direction * rot;
-            plane = plane * rot;
-        }
-        if (r.keys !is null && r.keys[VK_LEFT]) {
-            auto angle = rotationSpeed * delta;
-            auto rot = mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
-
-            direction = direction * rot;
-            plane = plane * rot;
-        }
+        inputHandler(r, w);
 
         // Render
         // foreach col on the screen
@@ -180,7 +157,7 @@ void frame(ref scope Renderer r, ref scope World w) {
                     auto c = pixels[(tex.w * texY) + texX];
                     vec3 color = vec3(c.r/255f, c.g/255f, c.b/255f).mult(vec3(light));// light;
                     color = vclamp(color) * 255f;
-                    r.buffer[x][y].full = vec3ToInt(color);
+                    r.buffers[bindex][x * textureWidth + y].full = vec3ToInt(color);
             }
 
             // Draw the floors and ceiling
@@ -235,7 +212,7 @@ void frame(ref scope Renderer r, ref scope World w) {
                 auto c = fpixels[(ftex.w * texY) + texX];
                 vec3 color = vec3(c.r/255f, c.g/255f, c.b/255f).mult(vec3(light));// light;
                 color = vclamp(color) * 255f;
-                r.buffer[x][y].full = vec3ToInt(color);
+                r.buffers[bindex][x * textureWidth + y].full = vec3ToInt(color);
                 
                 //ceiling (symmetrical!)
                 texX = cast(int)clamp((tile.x * ctex.w) % ctex.w, 0, ctex.w-1);
@@ -244,12 +221,44 @@ void frame(ref scope Renderer r, ref scope World w) {
                 c = cpixels[(ctex.w * texY) + texX];
                 color = vec3(c.r/255f, c.g/255f, c.b/255f).mult(vec3(light));// light;
                 color = vclamp(color) * 255f;
-                r.buffer[x][screen.y - 1- y].full = vec3ToInt(color);
+                r.buffers[bindex][x * textureWidth + (screen.y - 1- y)].full = vec3ToInt(color);
 
             } // y
         } // x
         //r.barrier.wait();
     }// with
+}
+
+
+void inputHandler(ref scope Renderer r, ref scope World w) {
+    with (w) {
+        const float delta = r.delta;
+        //if (delta >= 0) continue;
+
+        //// TODO: Collision
+        if (r.keys !is null && r.keys[VK_UP]) {
+            auto newpos = position + direction * moveSpeed * delta;
+            if (map[cast(int)newpos.y][cast(int)newpos.x] >= 'a') position = newpos;
+        }
+        if (r.keys !is null && r.keys[VK_DOWN]) {
+            auto newpos = position - direction * moveSpeed * delta;
+            if (map[cast(int)newpos.y][cast(int)newpos.x] >= 'a') position = newpos;
+        }        
+        if (r.keys !is null && r.keys[VK_RIGHT]) {
+            auto angle = -rotationSpeed * delta;
+            auto rot = mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
+
+            direction = direction * rot;
+            plane = plane * rot;
+        }
+        if (r.keys !is null && r.keys[VK_LEFT]) {
+            auto angle = rotationSpeed * delta;
+            auto rot = mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
+
+            direction = direction * rot;
+            plane = plane * rot;
+        }
+    }
 }
 
 

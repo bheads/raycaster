@@ -41,7 +41,7 @@ struct Renderer {
     private int             w;
     private int             h;
 
-    private SDL_Renderer*   renderer;
+    private SDL_Renderer*   rend;
     private SDL_Texture*    texture;
 
     private SDL_Event       event;
@@ -57,7 +57,11 @@ struct Renderer {
 
     IFImage[char]           textures;
 
-    Color[textureWidth][textureHeight]   buffer;
+    // Need two buffers in the heap
+    //Color[textureWidth][textureHeight]   buffer;
+    Color*[2]               buffers;
+    int                     bindex = 0;
+
     bool                    running = true;
 }
 
@@ -81,12 +85,16 @@ bool startFrame(ref scope Renderer r) {
 
         // Process events
         while (SDL_PollEvent(&event)) with(event) {
-            if(type == SDL_QUIT) return false; // fast exit!!
+            if(type == SDL_QUIT) {
+                r.running = false;
+                barrier.wait();
+                return false; // fast exit!!
+            }
         }
         keys = SDL_GetKeyboardState(null);
 
-        SDL_SetRenderDrawColor(renderer, 0, 0, 255, 0);
-        SDL_RenderClear(renderer);
+        SDL_SetRenderDrawColor(rend, 0, 0, 255, 0);
+        SDL_RenderClear(rend);
 //        sdlenforce(SDL_LockTexture(texture, null, &pixels, &pitch) == 0);
         //for(int i = 0; i < pitch * textureHeight; i++barrier) (cast(ubyte*) pixels)[i] = cast(ubyte)128;
     }
@@ -98,21 +106,22 @@ bool startFrame(ref scope Renderer r) {
 void endFrame(ref scope Renderer r) {
     with (r) {
   //      SDL_UnlockTexture(texture);
-        //r.barrier.wait();
-        SDL_UpdateTexture(texture, null, buffer.ptr, textureWidth * Color.sizeof);
+        barrier.wait();
+        SDL_UpdateTexture(texture, null, buffers[bindex], textureWidth * Color.sizeof);
+        bindex = (bindex + 1) % 2;
 
         // Note: sdl makes the quad then rotates it...
         auto destrect = SDL_Rect(0, h, h, w);
         auto rotrect = SDL_Point(0, 0);
-        sdlenforce(SDL_RenderCopyEx(renderer, texture, null, &destrect, -90.0, &rotrect, SDL_FLIP_NONE) == 0);
+        sdlenforce(SDL_RenderCopyEx(rend, texture, null, &destrect, -90.0, &rotrect, SDL_FLIP_NONE) == 0);
         //sdlenforce(SDL_RenderCopy(renderer, texture, &srcrect, &destrect) == 0);//, -90.0, null, SDL_FLIP_NONE) == 0);
-        SDL_RenderPresent(renderer);
+        SDL_RenderPresent(rend);
         
     }
 }
 
-const int textureWidth = 450;//450;
-const int textureHeight = 800;//800;
+const int textureWidth = 450;//0;//450;
+const int textureHeight = 800;//0;//800;
 
 import std.stdio;
 
@@ -120,19 +129,27 @@ import std.stdio;
 @trusted
 Renderer sdlInit(const int width = 800, const int height = 600) { 
     auto renderer = Renderer();
-    sdlenforce(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) == 0);
-    sdlenforce(SDL_CreateWindowAndRenderer(width, height, SDL_WINDOW_ALLOW_HIGHDPI, &renderer.window, &renderer.renderer) == 0);
-    renderer.w = width;
-    renderer.h = height;
-    renderer.texture =  sdlenforce(SDL_CreateTexture(renderer.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, textureWidth, textureHeight));
+    
+    with (renderer) {    
+        sdlenforce(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) == 0);
+        sdlenforce(window = SDL_CreateWindow("", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, SDL_WINDOW_ALLOW_HIGHDPI));
+        sdlenforce(rend = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC));
+        //sdlenforce(SDL_CreateWindowAndRenderer(width, height, SDL_WINDOW_ALLOW_HIGHDPI, &window, &rend) == 0);
+        w = width;
+        h = height;
+        texture =  sdlenforce(SDL_CreateTexture(rend, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, textureWidth, textureHeight));
 
-    renderer.last = SDL_GetPerformanceCounter();
+        last = SDL_GetPerformanceCounter();
 
-    renderer.textures['s'] = read_image("pics/stone1.png", ColFmt.RGBA);
-    renderer.textures['f'] = read_image("pics/floor.png", ColFmt.RGBA);
-    renderer.textures['c'] = read_image("pics/ceiling.png", ColFmt.RGBA);
+        textures['s'] = read_image("pics/stone1.png", ColFmt.RGBA);
+        textures['f'] = read_image("pics/floor.png", ColFmt.RGBA);
+        textures['c'] = read_image("pics/ceiling.png", ColFmt.RGBA);
 
-    //renderer.barrier = new Barrier(2);
+        barrier = new Barrier(2);
+
+        buffers[0] = (new Color[textureWidth * textureHeight]).ptr;
+        buffers[1] = (new Color[textureWidth * textureHeight]).ptr;
+    }
 
     return renderer;
 }
@@ -142,7 +159,7 @@ void sdlQuit(ref scope Renderer renderer) {
 
     // clean up window bits
     SDL_DestroyTexture(renderer.texture);
-    SDL_DestroyRenderer(renderer.renderer);
+    SDL_DestroyRenderer(renderer.rend);
     SDL_DestroyWindow(renderer.window);
 
     SDL_Quit();
